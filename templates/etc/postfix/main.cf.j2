@@ -2,7 +2,10 @@
 
 # See /usr/share/postfix/main.cf.dist for a commented, more complete version
 
-myorigin = {{ postfix_mailname }}
+# Debian specific:  Specifying a file name will cause the first
+# line of that file to be used as the name.  The Debian default
+# is /etc/mailname.
+myorigin = {{ postfix_mailname_file }}
 
 smtpd_banner = {{ postfix_smtpd_banner }}
 biff = no
@@ -16,8 +19,8 @@ append_dot_mydomain = no
 readme_directory = no
 
 # TLS parameters
-smtpd_tls_cert_file=/etc/ssl/certs/ssl-cert-snakeoil.pem
-smtpd_tls_key_file=/etc/ssl/private/ssl-cert-snakeoil.key
+smtpd_tls_cert_file={{ postfix_smtpd_tls_cert_file }}
+smtpd_tls_key_file={{ postfix_smtpd_tls_key_file }}
 smtpd_use_tls=yes
 smtpd_tls_session_cache_database = btree:${data_directory}/smtpd_scache
 smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
@@ -26,29 +29,54 @@ smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
 # information on enabling SSL in the smtp client.
 
 myhostname = {{ postfix_hostname }}
-alias_maps = hash:/etc/aliases
-alias_database = hash:/etc/aliases
+default_database_type = {{ postfix_default_database_type }}
+alias_maps = {{ postfix_default_database_type }}:{{ postfix_aliases_file }}
+alias_database = {{ postfix_default_database_type }}:{{ postfix_aliases_file }}
 {% if postfix_virtual_aliases %}
-virtual_alias_maps = hash:/etc/postfix/virtual
+virtual_alias_maps = {{ postfix_default_database_type }}:{{ postfix_virtual_aliases_file }}
 {% endif %}
 {% if postfix_sender_canonical_maps %}
-sender_canonical_maps = hash:/etc/postfix/sender_canonical_maps
+sender_canonical_maps = {{ postfix_default_database_type }}:{{ postfix_sender_canonical_maps_file }}
+{% endif %}
+{% if postfix_recipient_canonical_maps %}
+recipient_canonical_maps = {{ postfix_default_database_type }}:{{ postfix_recipient_canonical_maps_file }}
+{% endif %}
+{% if postfix_transport_maps %}
+transport_maps = {{ postfix_default_database_type }}:{{ postfix_transport_maps_file }}
+{% endif %}
+{% if postfix_sender_dependent_relayhost_maps %}
+sender_dependent_relayhost_maps = {{ postfix_default_database_type }}:{{ postfix_sender_dependent_relayhost_maps_file }}
 {% endif %}
 {% if postfix_generic %}
-smtp_generic_maps = hash:/etc/postfix/generic
+smtp_generic_maps = {{ postfix_default_database_type }}:{{ postfix_generic_file }}
+{% endif %}
+{% if postfix_header_checks %}
+smtp_header_checks = {{ postifx_header_checks_database_type }}:{{ postfix_header_checks_file }}
 {% endif %}
 mydestination = {{ postfix_mydestination | join(', ') }}
 mynetworks = {{ postfix_mynetworks | join(' ') }}
 mailbox_size_limit = 0
 recipient_delimiter = +
+{% if postfix_inet_interfaces is string %}
 inet_interfaces = {{ postfix_inet_interfaces }}
+{% else %}
+inet_interfaces = {{ postfix_inet_interfaces | join(', ') }}
+{% endif %}
+{% if postfix_inet_protocols is string %}
 inet_protocols = {{ postfix_inet_protocols }}
+{% else %}
+inet_protocols = {{ postfix_inet_protocols | join(', ') }}
+{% endif %}
 
 {% if postfix_relayhost %}
+{% if postfix_relayhost_mxlookup %}
+relayhost = {{ postfix_relayhost }}:{{ postfix_relayhost_port }}
+{% else %}
 relayhost = [{{ postfix_relayhost }}]:{{ postfix_relayhost_port }}
+{% endif %}
 {% if postfix_sasl_auth_enable %}
 smtp_sasl_auth_enable = {{ postfix_sasl_auth_enable | bool | ternary('yes', 'no') }}
-smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
+smtp_sasl_password_maps = {{ postfix_default_database_type }}:/etc/postfix/sasl_passwd
 smtp_sasl_security_options = {{ postfix_sasl_security_options }}
 smtp_sasl_mechanism_filter = {{ postfix_sasl_mechanism_filter }}
 {% endif %}
@@ -72,3 +100,7 @@ message_size_limit = {{  postfix_message_size_limit }}
 
 # Disable the SMTP VRFY command. This stops some techniques used to harvest email addresses.
 disable_vrfy_command = {{ postfix_disable_vrfy_command | bool | ternary('yes', 'no') }}
+
+{% for raw_option in postfix_raw_options | default([]) %}
+{{ raw_option }}
+{% endfor %}
