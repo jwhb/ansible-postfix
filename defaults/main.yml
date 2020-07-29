@@ -12,7 +12,7 @@ postfix_redhat_install:
   - mailx
   - cyrus-sasl
   - cyrus-sasl-lib
-  - libselinux-python
+  - python3-libselinux
 
 postfix_hostname: "{{ ansible_fqdn }}"
 postfix_mailname: "{{ ansible_fqdn }}"
